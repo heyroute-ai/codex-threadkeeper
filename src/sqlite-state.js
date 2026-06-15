@@ -77,6 +77,66 @@ function normalizeSqliteCwdPaths(db) {
   return updatedRows;
 }
 
+function recordIsUserEvent(record) {
+  return record?.type === "event_msg" && record?.payload?.type === "user_message";
+}
+
+async function rolloutHasUserEvent(rolloutPath) {
+  let text;
+  try {
+    text = await fs.readFile(rolloutPath, "utf8");
+  } catch {
+    return false;
+  }
+
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+    try {
+      if (recordIsUserEvent(JSON.parse(line))) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return false;
+}
+
+async function repairSqliteHasUserEventRows(db) {
+  let rows;
+  try {
+    rows = db.prepare(`
+      SELECT id, rollout_path
+      FROM threads
+      WHERE has_user_event = 0
+        AND TRIM(COALESCE(rollout_path, '')) <> ''
+    `).all();
+  } catch (error) {
+    if (isMissingColumnError(error, "rollout_path") || isMissingColumnError(error, "has_user_event")) {
+      return 0;
+    }
+    throw error;
+  }
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const stmt = db.prepare("UPDATE threads SET has_user_event = 1 WHERE id = ?");
+  let updatedRows = 0;
+  for (const row of rows) {
+    if (!(await rolloutHasUserEvent(row.rollout_path))) {
+      continue;
+    }
+    const result = stmt.run(row.id);
+    updatedRows += result.changes ?? 0;
+  }
+
+  return updatedRows;
+}
+
 export async function readSqliteProviderCounts(codexHome) {
   const dbPath = stateDbPath(codexHome);
   try {
@@ -172,9 +232,19 @@ export async function updateSqliteProvider(codexHome, targetProvider, afterUpdat
     await fs.access(dbPath);
   } catch {
     if (afterUpdate) {
-      await afterUpdate({ updatedRows: 0, cwdRowsUpdated: 0, databasePresent: false });
+      await afterUpdate({
+        updatedRows: 0,
+        cwdRowsUpdated: 0,
+        userEventRowsUpdated: 0,
+        databasePresent: false
+      });
     }
-    return { updatedRows: 0, cwdRowsUpdated: 0, databasePresent: false };
+    return {
+      updatedRows: 0,
+      cwdRowsUpdated: 0,
+      userEventRowsUpdated: 0,
+      databasePresent: false
+    };
   }
 
   const db = openDatabase(dbPath);
@@ -190,10 +260,12 @@ export async function updateSqliteProvider(codexHome, targetProvider, afterUpdat
     `);
     const result = stmt.run(targetProvider, targetProvider);
     const cwdRowsUpdated = normalizeSqliteCwdPaths(db);
+    const userEventRowsUpdated = await repairSqliteHasUserEventRows(db);
     if (afterUpdate) {
       await afterUpdate({
         updatedRows: result.changes ?? 0,
         cwdRowsUpdated,
+        userEventRowsUpdated,
         databasePresent: true
       });
     }
@@ -202,6 +274,7 @@ export async function updateSqliteProvider(codexHome, targetProvider, afterUpdat
     return {
       updatedRows: result.changes ?? 0,
       cwdRowsUpdated,
+      userEventRowsUpdated,
       databasePresent: true
     };
   } catch (error) {

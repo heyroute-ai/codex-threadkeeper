@@ -122,15 +122,25 @@ async function writeStateDb(codexHome, rows) {
     db.exec(`
       CREATE TABLE threads (
         id TEXT PRIMARY KEY,
+        rollout_path TEXT NOT NULL DEFAULT '',
         model_provider TEXT,
         archived INTEGER NOT NULL DEFAULT 0,
         cwd TEXT,
+        has_user_event INTEGER NOT NULL DEFAULT 0,
         first_user_message TEXT NOT NULL DEFAULT ''
       )
     `);
-    const stmt = db.prepare("INSERT INTO threads (id, model_provider, archived, cwd, first_user_message) VALUES (?, ?, ?, ?, ?)");
+    const stmt = db.prepare("INSERT INTO threads (id, rollout_path, model_provider, archived, cwd, has_user_event, first_user_message) VALUES (?, ?, ?, ?, ?, ?, ?)");
     for (const row of rows) {
-      stmt.run(row.id, row.model_provider, row.archived ? 1 : 0, row.cwd ?? null, row.first_user_message ?? "hello");
+      stmt.run(
+        row.id,
+        row.rollout_path ?? "",
+        row.model_provider,
+        row.archived ? 1 : 0,
+        row.cwd ?? null,
+        row.has_user_event ? 1 : 0,
+        row.first_user_message ?? "hello"
+      );
     }
   } finally {
     db.close();
@@ -523,18 +533,26 @@ test("runSync normalizes extended-length sqlite cwd paths for visible projects",
   const sessionPath = path.join(codexHome, "sessions", "2026", "03", "19", "rollout-a.jsonl");
   await writeRollout(sessionPath, "thread-a", "openai");
   await writeStateDb(codexHome, [
-    { id: "thread-a", model_provider: "openai", archived: false, cwd: "\\\\?\\E:\\VisibleProject" }
+    {
+      id: "thread-a",
+      rollout_path: sessionPath,
+      model_provider: "openai",
+      archived: false,
+      cwd: "\\\\?\\E:\\VisibleProject"
+    }
   ]);
 
   const result = await runSync({ codexHome });
   assert.equal(result.changedSessionFiles, 0);
   assert.equal(result.sqliteRowsUpdated, 0);
   assert.equal(result.sqliteCwdRowsUpdated, 1);
+  assert.equal(result.sqliteUserEventRowsUpdated, 1);
 
   const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
   try {
-    const row = db.prepare("SELECT cwd FROM threads WHERE id = ?").get("thread-a");
+    const row = db.prepare("SELECT cwd, has_user_event FROM threads WHERE id = ?").get("thread-a");
     assert.equal(row.cwd, "E:\\VisibleProject");
+    assert.equal(row.has_user_event, 1);
   } finally {
     db.close();
   }

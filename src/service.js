@@ -291,6 +291,7 @@ export async function runSync({
         skippedLockedRolloutFiles,
         sqliteRowsUpdated: sqliteResult.updatedRows,
         sqliteCwdRowsUpdated: sqliteResult.cwdRowsUpdated ?? 0,
+        sqliteUserEventRowsUpdated: sqliteResult.userEventRowsUpdated ?? 0,
         sqlitePresent: sqliteResult.databasePresent,
         rolloutCountsBefore: summarizeProviderCounts(providerCounts),
         autoPruneResult,
