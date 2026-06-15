@@ -558,6 +558,38 @@ test("runSync normalizes extended-length sqlite cwd paths for visible projects",
   }
 });
 
+test("runSync adds missing thread workspace hints for existing sidebar projects", async () => {
+  const { codexHome } = await makeTempCodexHome();
+  await writeConfig(codexHome, 'model_provider = "openai"');
+  await writeGlobalState(codexHome, {
+    "electron-saved-workspace-roots": ["E:\\VisibleProject"],
+    "project-order": ["E:\\VisibleProject"],
+    "thread-workspace-root-hints": {}
+  });
+  const sessionPath = path.join(codexHome, "sessions", "2026", "03", "19", "rollout-a.jsonl");
+  await writeRollout(sessionPath, "thread-a", "openai");
+  await writeStateDb(codexHome, [
+    {
+      id: "thread-a",
+      rollout_path: sessionPath,
+      model_provider: "openai",
+      archived: false,
+      cwd: "E:\\VisibleProject",
+      has_user_event: true
+    }
+  ]);
+
+  const result = await runSync({ codexHome });
+  assert.equal(result.addedSidebarProjects, 0);
+  assert.equal(result.addedThreadWorkspaceHints, 1);
+  assert.equal(result.normalizedThreadWorkspaceHints, 0);
+
+  const globalState = await readGlobalState(codexHome);
+  assert.equal(globalState["thread-workspace-root-hints"]["thread-a"], "E:\\VisibleProject");
+  assert.deepEqual(globalState["electron-saved-workspace-roots"], ["E:\\VisibleProject"]);
+  assert.deepEqual(globalState["project-order"], ["E:\\VisibleProject"]);
+});
+
 test("runSync restores pinned sidebar projects even when global state only keeps two projects", async () => {
   const { codexHome, root } = await makeTempCodexHome();
   await writeConfig(codexHome, 'model_provider = "openai"');
@@ -625,13 +657,14 @@ test("runSync does not resurrect projects from bare sqlite cwd history", async (
   const sessionPath = path.join(codexHome, "sessions", "2026", "03", "19", "rollout-a.jsonl");
   await writeRollout(sessionPath, "thread-a", "openai");
   await writeStateDb(codexHome, [
-    { id: "thread-a", model_provider: "openai", archived: false, cwd: "E:\\OldRemovedProject" }
+    { id: "thread-a", model_provider: "openai", archived: false, cwd: "E:\\OldRemovedProject", has_user_event: true }
   ]);
 
   const result = await runSync({ codexHome });
   assert.equal(result.changedSessionFiles, 0);
   assert.equal(result.sqliteRowsUpdated, 0);
   assert.equal(result.addedSidebarProjects, 0);
+  assert.equal(result.addedThreadWorkspaceHints, 0);
 
   const globalState = await readGlobalState(codexHome);
   assert.deepEqual(globalState["electron-saved-workspace-roots"], ["E:\\KeepMe"]);

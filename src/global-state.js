@@ -170,7 +170,26 @@ export async function syncSidebarProjects(codexHome, workspaceRoots) {
   return syncSidebarProjectsWithPinned(codexHome, workspaceRoots, []);
 }
 
-export async function syncSidebarProjectsWithPinned(codexHome, workspaceRoots, pinnedProjects = []) {
+function collectThreadWorkspaceHintUpdates(threadWorkspaceHints, allowedProjectKeys) {
+  const updates = [];
+  for (const hint of threadWorkspaceHints ?? []) {
+    if (!hint || typeof hint.id !== "string" || !hint.id.trim()) {
+      continue;
+    }
+    const normalized = normalizeWorkspaceRootPath(hint.workspaceRoot);
+    const key = workspaceRootKey(normalized);
+    if (!normalized || !key || !allowedProjectKeys.has(key)) {
+      continue;
+    }
+    updates.push({
+      id: hint.id,
+      workspaceRoot: normalized
+    });
+  }
+  return updates;
+}
+
+export async function syncSidebarProjectsWithPinned(codexHome, workspaceRoots, pinnedProjects = [], threadWorkspaceHints = []) {
   const state = await readGlobalState(codexHome);
   const knownSidebarProjects = collectKnownSidebarProjects(state.data, codexHome);
   const sqliteProjectKeys = new Set(
@@ -247,7 +266,33 @@ export async function syncSidebarProjectsWithPinned(codexHome, workspaceRoots, p
     pinnedAddedProjects.push(workspaceRoot);
   }
 
-  if (addedProjects.length === 0 && pinnedAddedProjects.length === 0) {
+  const allowedProjectKeys = new Set([...workspaceRootKeys, ...projectOrderKeys]);
+  const threadHintUpdates = collectThreadWorkspaceHintUpdates(threadWorkspaceHints, allowedProjectKeys);
+  const currentThreadHints = state.data?.["thread-workspace-root-hints"] && typeof state.data["thread-workspace-root-hints"] === "object"
+    ? state.data["thread-workspace-root-hints"]
+    : {};
+  const nextThreadHints = { ...currentThreadHints };
+  const addedThreadWorkspaceHints = [];
+  const normalizedThreadWorkspaceHints = [];
+  for (const hint of threadHintUpdates) {
+    const existing = currentThreadHints[hint.id];
+    if (existing === hint.workspaceRoot) {
+      continue;
+    }
+    nextThreadHints[hint.id] = hint.workspaceRoot;
+    if (existing === undefined) {
+      addedThreadWorkspaceHints.push(hint);
+    } else {
+      normalizedThreadWorkspaceHints.push(hint);
+    }
+  }
+
+  if (
+    addedProjects.length === 0
+    && pinnedAddedProjects.length === 0
+    && addedThreadWorkspaceHints.length === 0
+    && normalizedThreadWorkspaceHints.length === 0
+  ) {
     return {
       filePath: state.filePath,
       existed: state.exists,
@@ -258,13 +303,18 @@ export async function syncSidebarProjectsWithPinned(codexHome, workspaceRoots, p
       pinnedAddedProjects: [],
       pinnedAddedCount: 0,
       skippedPinnedProjects,
-      skippedPinnedCount: skippedPinnedProjects.length
+      skippedPinnedCount: skippedPinnedProjects.length,
+      addedThreadWorkspaceHints: [],
+      addedThreadWorkspaceHintCount: 0,
+      normalizedThreadWorkspaceHints: [],
+      normalizedThreadWorkspaceHintCount: 0
     };
   }
 
   const nextState = state.exists ? { ...state.data } : {};
   nextState["electron-saved-workspace-roots"] = workspaceRootsList;
   nextState["project-order"] = projectOrderList;
+  nextState["thread-workspace-root-hints"] = nextThreadHints;
 
   await fs.writeFile(state.filePath, JSON.stringify(nextState), "utf8");
   return {
@@ -277,7 +327,11 @@ export async function syncSidebarProjectsWithPinned(codexHome, workspaceRoots, p
     pinnedAddedProjects,
     pinnedAddedCount: pinnedAddedProjects.length,
     skippedPinnedProjects,
-    skippedPinnedCount: skippedPinnedProjects.length
+    skippedPinnedCount: skippedPinnedProjects.length,
+    addedThreadWorkspaceHints,
+    addedThreadWorkspaceHintCount: addedThreadWorkspaceHints.length,
+    normalizedThreadWorkspaceHints,
+    normalizedThreadWorkspaceHintCount: normalizedThreadWorkspaceHints.length
   };
 }
 

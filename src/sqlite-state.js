@@ -200,6 +200,39 @@ export async function readSqliteProjectPaths(codexHome) {
   }
 }
 
+export async function readSqliteThreadWorkspaceHints(codexHome) {
+  const dbPath = stateDbPath(codexHome);
+  try {
+    await fs.access(dbPath);
+  } catch {
+    return [];
+  }
+
+  const db = openDatabase(dbPath);
+  try {
+    const rows = db.prepare(`
+      SELECT id, cwd
+      FROM threads
+      WHERE archived = 0
+        AND has_user_event = 1
+        AND TRIM(COALESCE(id, '')) <> ''
+        AND TRIM(COALESCE(cwd, '')) <> ''
+      ORDER BY id
+    `).all();
+    return rows.map((row) => ({ id: row.id, workspaceRoot: row.cwd }));
+  } catch (error) {
+    if (
+      isMissingColumnError(error, "cwd")
+      || isMissingColumnError(error, "has_user_event")
+    ) {
+      return [];
+    }
+    throw error;
+  } finally {
+    db.close();
+  }
+}
+
 export async function assertSqliteWritable(codexHome, options = {}) {
   const dbPath = stateDbPath(codexHome);
   try {

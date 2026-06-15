@@ -68,6 +68,8 @@ function summarizeSync(result, label) {
     `Added sidebar projects: ${result.addedSidebarProjects ?? 0}`,
     `Restored pinned sidebar projects: ${result.restoredPinnedSidebarProjects ?? 0}`,
     `Skipped missing pinned sidebar projects: ${result.skippedMissingPinnedSidebarProjects ?? 0}`,
+    `Added thread workspace hints: ${result.addedThreadWorkspaceHints ?? 0}`,
+    `Normalized thread workspace hints: ${result.normalizedThreadWorkspaceHints ?? 0}`,
     `Updated SQLite rows: ${result.sqliteRowsUpdated}${result.sqlitePresent ? "" : " (state_5.sqlite not found)"}`,
     `Normalized SQLite cwd rows: ${result.sqliteCwdRowsUpdated ?? 0}${result.sqlitePresent ? "" : " (state_5.sqlite not found)"}`,
     `Repaired SQLite user-event rows: ${result.sqliteUserEventRowsUpdated ?? 0}${result.sqlitePresent ? "" : " (state_5.sqlite not found)"}`

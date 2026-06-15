@@ -38,6 +38,7 @@ import {
 import {
   assertSqliteWritable,
   readSqliteProjectPaths,
+  readSqliteThreadWorkspaceHints,
   readSqliteProviderCounts,
   updateSqliteProvider
 } from "./sqlite-state.js";
@@ -197,6 +198,7 @@ export async function runSync({
       durationMs: backupDurationMs
     });
     const sqliteProjectPaths = await readSqliteProjectPaths(codexHome);
+    const sqliteThreadWorkspaceHints = await readSqliteThreadWorkspaceHints(codexHome);
     const pinnedProjectState = await readPinnedProjects(codexHome);
 
     let sessionRestoreNeeded = false;
@@ -231,7 +233,12 @@ export async function runSync({
             await updateSessionBackupManifest(backupDir, appliedSessionChanges);
           }
           emitProgress(onProgress, { stage: "sync_sidebar_projects", status: "start" });
-          sidebarSyncResult = await syncSidebarProjectsWithPinned(codexHome, sqliteProjectPaths, pinnedProjectState.projects);
+          sidebarSyncResult = await syncSidebarProjectsWithPinned(
+            codexHome,
+            sqliteProjectPaths,
+            pinnedProjectState.projects,
+            sqliteThreadWorkspaceHints
+          );
           if (sidebarSyncResult.modified) {
             globalStateRestoreSnapshot = sidebarSyncResult;
           }
@@ -240,7 +247,9 @@ export async function runSync({
             status: "complete",
             addedCount: sidebarSyncResult.addedCount,
             pinnedAddedCount: sidebarSyncResult.pinnedAddedCount,
-            skippedPinnedCount: sidebarSyncResult.skippedPinnedCount
+            skippedPinnedCount: sidebarSyncResult.skippedPinnedCount,
+            addedThreadWorkspaceHintCount: sidebarSyncResult.addedThreadWorkspaceHintCount,
+            normalizedThreadWorkspaceHintCount: sidebarSyncResult.normalizedThreadWorkspaceHintCount
           });
         },
         { busyTimeoutMs: sqliteBusyTimeoutMs }
@@ -288,6 +297,8 @@ export async function runSync({
         addedSidebarProjects: sidebarSyncResult.addedCount,
         restoredPinnedSidebarProjects: sidebarSyncResult.pinnedAddedCount,
         skippedMissingPinnedSidebarProjects: sidebarSyncResult.skippedPinnedCount,
+        addedThreadWorkspaceHints: sidebarSyncResult.addedThreadWorkspaceHintCount ?? 0,
+        normalizedThreadWorkspaceHints: sidebarSyncResult.normalizedThreadWorkspaceHintCount ?? 0,
         skippedLockedRolloutFiles,
         sqliteRowsUpdated: sqliteResult.updatedRows,
         sqliteCwdRowsUpdated: sqliteResult.cwdRowsUpdated ?? 0,
