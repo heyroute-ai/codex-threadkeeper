@@ -117,6 +117,49 @@ Those three numbers tell you whether the run repaired rollout metadata, sidebar 
 
 Run `status` again after that. If rollout and SQLite provider counts now agree, the repair is usually complete.
 
+## Key Troubleshooting Lesson: Why `sync` Can Bring History Back
+
+One failure mode is easy to misread: old threads briefly flash in the UI and then disappear again, or early `sync` runs keep reporting `Updated SQLite rows: 0`.
+
+That is usually not a generic cache problem, and it is not caused by `.codex` simply being messy. The first thing to verify is the SQLite database Codex App actually reads today:
+
+```text
+~/.codex/sqlite/state_5.sqlite
+```
+
+Older Codex builds or older helper tools may also leave this legacy path behind:
+
+```text
+~/.codex/state_5.sqlite
+```
+
+If the legacy database already has the target provider but the modern database still has the old provider, Codex App will still render from the modern database and the threads can remain hidden. A real repair usually needs to align several fields together:
+
+- rollout `model_provider`
+- SQLite `threads.model_provider`
+- SQLite `threads.cwd`, especially Windows extended-length paths such as `\\?\E:\repo`
+- SQLite `threads.has_user_event`
+- `.codex-global-state.json` `thread-workspace-root-hints`
+
+So do not judge a repair by rollout files alone. Check whether `status` shows matching provider counts for rollout and SQLite. If `sync` reports these fields, it usually means the command repaired the index Codex App is actually using:
+
+```text
+Updated SQLite rows: ...
+Normalized SQLite cwd rows: ...
+Repaired SQLite user-event rows: ...
+Added thread workspace hints: ...
+```
+
+That is why the recommended repair sequence is:
+
+```bash
+codex-threadkeeper status
+codex-threadkeeper sync
+codex-threadkeeper status
+```
+
+Manual rollout edits alone can make the files look correct while Codex App continues to hide threads based on stale SQLite metadata.
+
 ## Install
 
 ### CLI

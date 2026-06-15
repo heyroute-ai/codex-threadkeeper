@@ -122,6 +122,49 @@ codex-threadkeeper status
 
 看到 rollout 和 SQLite 的 provider 计数都已经一致，基本就说明修复完成了。
 
+## 关键排障经验：为什么 `sync` 能把历史会话救回来
+
+有一种很容易误判的情况：历史会话在界面里“闪一下又消失”，或者 `sync` 输出里一开始长期显示 `Updated SQLite rows: 0`。
+
+这通常不是普通缓存问题，也不是 `.codex` 目录里垃圾太多。真正要检查的是 Codex App 当前实际读取的 SQLite：
+
+```text
+~/.codex/sqlite/state_5.sqlite
+```
+
+旧版或旧工具可能还会留下这个兼容路径：
+
+```text
+~/.codex/state_5.sqlite
+```
+
+如果旧库已经是目标 provider，但现代库仍然是旧 provider，Codex App 还是会按现代库显示，历史就会继续不见。一次有效的修复通常会同时修这几类元数据：
+
+- rollout 里的 `model_provider`
+- SQLite `threads.model_provider`
+- SQLite `threads.cwd`，尤其是 `\\?\E:\repo` 这种 Windows extended-length 前缀
+- SQLite `threads.has_user_event`
+- `.codex-global-state.json` 里的 `thread-workspace-root-hints`
+
+所以判断一次修复是否真正命中病根，不只看 rollout，也要看 `status` 里 SQLite 的 provider 计数是否已经和 rollout 一致。如果 `sync` 输出出现这些数字，通常说明它确实修到了 Codex App 正在读的索引：
+
+```text
+Updated SQLite rows: ...
+Normalized SQLite cwd rows: ...
+Repaired SQLite user-event rows: ...
+Added thread workspace hints: ...
+```
+
+这也是为什么这类问题推荐先跑：
+
+```bash
+codex-threadkeeper status
+codex-threadkeeper sync
+codex-threadkeeper status
+```
+
+而不是手动只改 rollout 文件。手动只改 rollout 很容易让“文件看起来对了”，但 Codex App 仍然按错误的 SQLite 索引隐藏线程。
+
 ## 安装
 
 ### CLI

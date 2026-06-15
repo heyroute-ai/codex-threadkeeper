@@ -21,6 +21,33 @@ The CLI may also repair missing sidebar project roots from recorded thread metad
 
 Do not solve this by manually editing rollout files only unless the user explicitly asks for manual intervention.
 
+## Important Diagnostic Lesson
+
+If history appears briefly and then disappears again, do not assume it is only a cache problem or that `.codex` is simply too messy.
+
+First verify which SQLite database Codex App is actually reading:
+
+- modern path: `~/.codex/sqlite/state_5.sqlite`
+- legacy fallback: `~/.codex/state_5.sqlite`
+
+The modern path is authoritative when it exists. A common failure mode is:
+
+- rollout files already show the target provider
+- the legacy root `state_5.sqlite` already shows the target provider
+- the modern `sqlite/state_5.sqlite` still has stale provider/cwd/user-event metadata
+
+In that case Codex App will keep rendering from the stale modern SQLite index, so history can still be hidden even after rollout files look correct.
+
+An effective sync should be able to repair these together:
+
+- rollout `model_provider`
+- SQLite `threads.model_provider`
+- SQLite `threads.cwd`, including `\\?\` extended-length Windows prefixes
+- SQLite `threads.has_user_event`
+- `.codex-global-state.json` `thread-workspace-root-hints`
+
+When diagnosing, compare rollout counts and SQLite counts from `codex-threadkeeper status`. After a successful repair, they should align under the current provider. Treat nonzero `Normalized SQLite cwd rows`, `Repaired SQLite user-event rows`, or `Added thread workspace hints` as useful signs that the command repaired the index Codex App actually uses.
+
 ## Preferred Flow
 
 Use this order by default:
