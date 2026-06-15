@@ -510,6 +510,36 @@ test("runSync adds missing sidebar projects even when rollout and sqlite provide
   assert.deepEqual(globalState["project-order"], ["E:\\MissingSidebar"]);
 });
 
+test("runSync normalizes extended-length sqlite cwd paths for visible projects", async () => {
+  const { codexHome } = await makeTempCodexHome();
+  await writeConfig(codexHome, 'model_provider = "openai"');
+  await writeGlobalState(codexHome, {
+    "electron-saved-workspace-roots": ["E:\\VisibleProject"],
+    "project-order": ["E:\\VisibleProject"],
+    "thread-workspace-root-hints": {
+      alpha: "E:\\VisibleProject"
+    }
+  });
+  const sessionPath = path.join(codexHome, "sessions", "2026", "03", "19", "rollout-a.jsonl");
+  await writeRollout(sessionPath, "thread-a", "openai");
+  await writeStateDb(codexHome, [
+    { id: "thread-a", model_provider: "openai", archived: false, cwd: "\\\\?\\E:\\VisibleProject" }
+  ]);
+
+  const result = await runSync({ codexHome });
+  assert.equal(result.changedSessionFiles, 0);
+  assert.equal(result.sqliteRowsUpdated, 0);
+  assert.equal(result.sqliteCwdRowsUpdated, 1);
+
+  const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  try {
+    const row = db.prepare("SELECT cwd FROM threads WHERE id = ?").get("thread-a");
+    assert.equal(row.cwd, "E:\\VisibleProject");
+  } finally {
+    db.close();
+  }
+});
+
 test("runSync restores pinned sidebar projects even when global state only keeps two projects", async () => {
   const { codexHome, root } = await makeTempCodexHome();
   await writeConfig(codexHome, 'model_provider = "openai"');

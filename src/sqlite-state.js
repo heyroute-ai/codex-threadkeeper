@@ -3,6 +3,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { DB_FILE_BASENAME } from "./constants.js";
+import { normalizeWorkspaceRootPath } from "./global-state.js";
 
 const DEFAULT_BUSY_TIMEOUT_MS = 5000;
 
@@ -41,6 +42,39 @@ function wrapSqliteBusyError(error, action) {
 function isMissingColumnError(error, columnName) {
   const message = `${error?.message ?? ""}`.toLowerCase();
   return message.includes(`no such column: ${columnName.toLowerCase()}`);
+}
+
+function normalizeSqliteCwd(cwd) {
+  if (typeof cwd !== "string" || !/^\\\\\?\\[a-z]:[\\/]/i.test(cwd)) {
+    return null;
+  }
+
+  const normalized = normalizeWorkspaceRootPath(cwd);
+  return normalized && normalized !== cwd ? normalized : null;
+}
+
+function normalizeSqliteCwdPaths(db) {
+  const rows = db.prepare(`
+    SELECT id, cwd
+    FROM threads
+    WHERE cwd LIKE '\\\\?\\%'
+  `).all();
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const stmt = db.prepare("UPDATE threads SET cwd = ? WHERE id = ?");
+  let updatedRows = 0;
+  for (const row of rows) {
+    const normalized = normalizeSqliteCwd(row.cwd);
+    if (!normalized) {
+      continue;
+    }
+    const result = stmt.run(normalized, row.id);
+    updatedRows += result.changes ?? 0;
+  }
+
+  return updatedRows;
 }
 
 export async function readSqliteProviderCounts(codexHome) {
@@ -138,9 +172,9 @@ export async function updateSqliteProvider(codexHome, targetProvider, afterUpdat
     await fs.access(dbPath);
   } catch {
     if (afterUpdate) {
-      await afterUpdate({ updatedRows: 0, databasePresent: false });
+      await afterUpdate({ updatedRows: 0, cwdRowsUpdated: 0, databasePresent: false });
     }
-    return { updatedRows: 0, databasePresent: false };
+    return { updatedRows: 0, cwdRowsUpdated: 0, databasePresent: false };
   }
 
   const db = openDatabase(dbPath);
@@ -155,15 +189,21 @@ export async function updateSqliteProvider(codexHome, targetProvider, afterUpdat
       WHERE COALESCE(model_provider, '') <> ?
     `);
     const result = stmt.run(targetProvider, targetProvider);
+    const cwdRowsUpdated = normalizeSqliteCwdPaths(db);
     if (afterUpdate) {
       await afterUpdate({
         updatedRows: result.changes ?? 0,
+        cwdRowsUpdated,
         databasePresent: true
       });
     }
     db.exec("COMMIT");
     transactionOpen = false;
-    return { updatedRows: result.changes ?? 0, databasePresent: true };
+    return {
+      updatedRows: result.changes ?? 0,
+      cwdRowsUpdated,
+      databasePresent: true
+    };
   } catch (error) {
     if (transactionOpen) {
       try {

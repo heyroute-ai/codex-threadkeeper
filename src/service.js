@@ -290,6 +290,7 @@ export async function runSync({
         skippedMissingPinnedSidebarProjects: sidebarSyncResult.skippedPinnedCount,
         skippedLockedRolloutFiles,
         sqliteRowsUpdated: sqliteResult.updatedRows,
+        sqliteCwdRowsUpdated: sqliteResult.cwdRowsUpdated ?? 0,
         sqlitePresent: sqliteResult.databasePresent,
         rolloutCountsBefore: summarizeProviderCounts(providerCounts),
         autoPruneResult,
