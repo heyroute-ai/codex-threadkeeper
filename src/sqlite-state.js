@@ -8,7 +8,34 @@ import { normalizeWorkspaceRootPath } from "./global-state.js";
 const DEFAULT_BUSY_TIMEOUT_MS = 5000;
 
 export function stateDbPath(codexHome) {
+  return path.join(codexHome, "sqlite", DB_FILE_BASENAME);
+}
+
+export function legacyStateDbPath(codexHome) {
   return path.join(codexHome, DB_FILE_BASENAME);
+}
+
+async function pathExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function stateDbPathForRead(codexHome) {
+  const modernPath = stateDbPath(codexHome);
+  if (await pathExists(modernPath)) {
+    return modernPath;
+  }
+
+  const legacyPath = legacyStateDbPath(codexHome);
+  if (await pathExists(legacyPath)) {
+    return legacyPath;
+  }
+
+  return modernPath;
 }
 
 function openDatabase(dbPath) {
@@ -77,6 +104,16 @@ function normalizeSqliteCwdPaths(db) {
   return updatedRows;
 }
 
+function collectSqliteProjectPaths(db) {
+  const rows = db.prepare(`
+    SELECT DISTINCT cwd
+    FROM threads
+    WHERE TRIM(COALESCE(cwd, '')) <> ''
+    ORDER BY LOWER(cwd), cwd
+  `).all();
+  return rows.map((row) => row.cwd);
+}
+
 function recordIsUserEvent(record) {
   return record?.type === "event_msg" && record?.payload?.type === "user_message";
 }
@@ -137,11 +174,22 @@ async function repairSqliteHasUserEventRows(db) {
   return updatedRows;
 }
 
+function collectSqliteThreadWorkspaceHints(db) {
+  const rows = db.prepare(`
+    SELECT id, cwd
+    FROM threads
+    WHERE archived = 0
+      AND has_user_event = 1
+      AND TRIM(COALESCE(id, '')) <> ''
+      AND TRIM(COALESCE(cwd, '')) <> ''
+    ORDER BY id
+  `).all();
+  return rows.map((row) => ({ id: row.id, workspaceRoot: row.cwd }));
+}
+
 export async function readSqliteProviderCounts(codexHome) {
-  const dbPath = stateDbPath(codexHome);
-  try {
-    await fs.access(dbPath);
-  } catch {
+  const dbPath = await stateDbPathForRead(codexHome);
+  if (!(await pathExists(dbPath))) {
     return null;
   }
 
@@ -174,22 +222,14 @@ export async function readSqliteProviderCounts(codexHome) {
 }
 
 export async function readSqliteProjectPaths(codexHome) {
-  const dbPath = stateDbPath(codexHome);
-  try {
-    await fs.access(dbPath);
-  } catch {
+  const dbPath = await stateDbPathForRead(codexHome);
+  if (!(await pathExists(dbPath))) {
     return [];
   }
 
   const db = openDatabase(dbPath);
   try {
-    const rows = db.prepare(`
-      SELECT DISTINCT cwd
-      FROM threads
-      WHERE TRIM(COALESCE(cwd, '')) <> ''
-      ORDER BY LOWER(cwd), cwd
-    `).all();
-    return rows.map((row) => row.cwd);
+    return collectSqliteProjectPaths(db);
   } catch (error) {
     if (isMissingColumnError(error, "cwd")) {
       return [];
@@ -201,25 +241,14 @@ export async function readSqliteProjectPaths(codexHome) {
 }
 
 export async function readSqliteThreadWorkspaceHints(codexHome) {
-  const dbPath = stateDbPath(codexHome);
-  try {
-    await fs.access(dbPath);
-  } catch {
+  const dbPath = await stateDbPathForRead(codexHome);
+  if (!(await pathExists(dbPath))) {
     return [];
   }
 
   const db = openDatabase(dbPath);
   try {
-    const rows = db.prepare(`
-      SELECT id, cwd
-      FROM threads
-      WHERE archived = 0
-        AND has_user_event = 1
-        AND TRIM(COALESCE(id, '')) <> ''
-        AND TRIM(COALESCE(cwd, '')) <> ''
-      ORDER BY id
-    `).all();
-    return rows.map((row) => ({ id: row.id, workspaceRoot: row.cwd }));
+    return collectSqliteThreadWorkspaceHints(db);
   } catch (error) {
     if (
       isMissingColumnError(error, "cwd")
@@ -234,10 +263,8 @@ export async function readSqliteThreadWorkspaceHints(codexHome) {
 }
 
 export async function assertSqliteWritable(codexHome, options = {}) {
-  const dbPath = stateDbPath(codexHome);
-  try {
-    await fs.access(dbPath);
-  } catch {
+  const dbPath = await stateDbPathForRead(codexHome);
+  if (!(await pathExists(dbPath))) {
     return { databasePresent: false };
   }
 
@@ -260,10 +287,8 @@ export async function updateSqliteProvider(codexHome, targetProvider, afterUpdat
     ? (maybeOptions ?? {})
     : (afterUpdateOrOptions ?? {});
 
-  const dbPath = stateDbPath(codexHome);
-  try {
-    await fs.access(dbPath);
-  } catch {
+  const dbPath = await stateDbPathForRead(codexHome);
+  if (!(await pathExists(dbPath))) {
     if (afterUpdate) {
       await afterUpdate({
         updatedRows: 0,
@@ -294,12 +319,16 @@ export async function updateSqliteProvider(codexHome, targetProvider, afterUpdat
     const result = stmt.run(targetProvider, targetProvider);
     const cwdRowsUpdated = normalizeSqliteCwdPaths(db);
     const userEventRowsUpdated = await repairSqliteHasUserEventRows(db);
+    const projectPaths = collectSqliteProjectPaths(db);
+    const threadWorkspaceHints = collectSqliteThreadWorkspaceHints(db);
     if (afterUpdate) {
       await afterUpdate({
         updatedRows: result.changes ?? 0,
         cwdRowsUpdated,
         userEventRowsUpdated,
-        databasePresent: true
+        databasePresent: true,
+        projectPaths,
+        threadWorkspaceHints
       });
     }
     db.exec("COMMIT");

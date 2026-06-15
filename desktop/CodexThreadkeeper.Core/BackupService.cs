@@ -29,7 +29,10 @@ public sealed class BackupService
         foreach (string suffix in new[] { string.Empty, "-shm", "-wal" })
         {
             string fileName = $"{AppConstants.DbFileBasename}{suffix}";
-            if (await CopyIfPresentAsync(Path.Combine(codexHome, fileName), Path.Combine(dbDir, fileName), overwrite: false))
+            string modernPath = Path.Combine(codexHome, "sqlite", fileName);
+            string legacyPath = Path.Combine(codexHome, fileName);
+            if (await CopyIfPresentAsync(modernPath, Path.Combine(dbDir, fileName), overwrite: false)
+                || await CopyIfPresentAsync(legacyPath, Path.Combine(dbDir, fileName), overwrite: false))
             {
                 copiedDbFiles.Add(fileName);
             }
@@ -147,16 +150,23 @@ public sealed class BackupService
             foreach (string suffix in new[] { string.Empty, "-shm", "-wal" })
             {
                 string fileName = $"{AppConstants.DbFileBasename}{suffix}";
-                string targetPath = Path.Combine(codexHome, fileName);
-                if (!backedUpFiles.Contains(fileName) && File.Exists(targetPath))
+                string modernTargetPath = Path.Combine(codexHome, "sqlite", fileName);
+                string legacyTargetPath = Path.Combine(codexHome, fileName);
+                if (!backedUpFiles.Contains(fileName) && File.Exists(modernTargetPath))
                 {
-                    File.Delete(targetPath);
+                    File.Delete(modernTargetPath);
+                }
+                if (!backedUpFiles.Contains(fileName) && File.Exists(legacyTargetPath))
+                {
+                    File.Delete(legacyTargetPath);
                 }
             }
 
             foreach (string fileName in metadata.DbFiles)
             {
-                await CopyIfPresentAsync(Path.Combine(dbDir, fileName), Path.Combine(codexHome, fileName), overwrite: true);
+                string backupPath = Path.Combine(dbDir, fileName);
+                await CopyIfPresentAsync(backupPath, Path.Combine(codexHome, "sqlite", fileName), overwrite: true);
+                await CopyIfPresentAsync(backupPath, Path.Combine(codexHome, fileName), overwrite: true);
             }
         }
 

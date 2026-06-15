@@ -33,7 +33,7 @@ Typical symptoms:
 `codex-threadkeeper` realigns the metadata that drives visibility:
 
 - rollout files in `~/.codex/sessions` and `~/.codex/archived_sessions`
-- SQLite thread state in `~/.codex/state_5.sqlite`
+- SQLite thread state in `~/.codex/sqlite/state_5.sqlite` (legacy fallback: `~/.codex/state_5.sqlite`)
 - sidebar project state in `.codex-global-state.json`
 - managed backups in `~/.codex/backups_state/threadkeeper`
 

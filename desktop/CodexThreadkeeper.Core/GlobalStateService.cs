@@ -121,7 +121,8 @@ public sealed class GlobalStateService
     internal async Task<SidebarSyncResult> SyncSidebarProjectsAsync(
         string codexHome,
         IEnumerable<string> workspaceRoots,
-        IEnumerable<string> pinnedProjects)
+        IEnumerable<string> pinnedProjects,
+        IEnumerable<ThreadWorkspaceHint>? threadWorkspaceHints = null)
     {
         GlobalStateSnapshot snapshot = await ReadGlobalStateAsync(codexHome);
         List<string> knownSidebarProjects = CollectKnownSidebarProjects(snapshot.Data, codexHome);
@@ -199,7 +200,37 @@ public sealed class GlobalStateService
             pinnedAddedProjects.Add(project);
         }
 
-        if (addedProjects.Count == 0 && pinnedAddedProjects.Count == 0)
+        HashSet<string> allowedProjectKeys = new([.. workspaceRootKeys, .. projectOrderKeys], StringComparer.Ordinal);
+        List<ThreadWorkspaceHint> threadHintUpdates = CollectThreadWorkspaceHintUpdates(threadWorkspaceHints ?? [], allowedProjectKeys);
+        JsonObject currentThreadHints = snapshot.Data?["thread-workspace-root-hints"] as JsonObject ?? new JsonObject();
+        JsonObject nextThreadHints = JsonNode.Parse(currentThreadHints.ToJsonString()) as JsonObject ?? new JsonObject();
+        List<ThreadWorkspaceHint> addedThreadWorkspaceHints = [];
+        List<ThreadWorkspaceHint> normalizedThreadWorkspaceHints = [];
+        foreach (ThreadWorkspaceHint hint in threadHintUpdates)
+        {
+            string? existing = TryGetString(currentThreadHints[hint.Id], out string existingValue)
+                ? existingValue
+                : null;
+            if (string.Equals(existing, hint.WorkspaceRoot, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            nextThreadHints[hint.Id] = hint.WorkspaceRoot;
+            if (existing is null)
+            {
+                addedThreadWorkspaceHints.Add(hint);
+            }
+            else
+            {
+                normalizedThreadWorkspaceHints.Add(hint);
+            }
+        }
+
+        if (addedProjects.Count == 0
+            && pinnedAddedProjects.Count == 0
+            && addedThreadWorkspaceHints.Count == 0
+            && normalizedThreadWorkspaceHints.Count == 0)
         {
             return new SidebarSyncResult
             {
@@ -212,7 +243,11 @@ public sealed class GlobalStateService
                 PinnedAddedProjects = [],
                 PinnedAddedCount = 0,
                 SkippedPinnedProjects = skippedPinnedProjects,
-                SkippedPinnedCount = skippedPinnedProjects.Count
+                SkippedPinnedCount = skippedPinnedProjects.Count,
+                AddedThreadWorkspaceHints = [],
+                AddedThreadWorkspaceHintCount = 0,
+                NormalizedThreadWorkspaceHints = [],
+                NormalizedThreadWorkspaceHintCount = 0
             };
         }
 
@@ -221,6 +256,7 @@ public sealed class GlobalStateService
             : new JsonObject();
         nextState["electron-saved-workspace-roots"] = CreateStringArray(workspaceRootsList);
         nextState["project-order"] = CreateStringArray(projectOrderList);
+        nextState["thread-workspace-root-hints"] = nextThreadHints;
 
         Directory.CreateDirectory(Path.GetDirectoryName(snapshot.FilePath)!);
         await File.WriteAllTextAsync(snapshot.FilePath, nextState.ToJsonString(WriteJsonOptions));
@@ -236,7 +272,11 @@ public sealed class GlobalStateService
             PinnedAddedProjects = pinnedAddedProjects,
             PinnedAddedCount = pinnedAddedProjects.Count,
             SkippedPinnedProjects = skippedPinnedProjects,
-            SkippedPinnedCount = skippedPinnedProjects.Count
+            SkippedPinnedCount = skippedPinnedProjects.Count,
+            AddedThreadWorkspaceHints = addedThreadWorkspaceHints,
+            AddedThreadWorkspaceHintCount = addedThreadWorkspaceHints.Count,
+            NormalizedThreadWorkspaceHints = normalizedThreadWorkspaceHints,
+            NormalizedThreadWorkspaceHintCount = normalizedThreadWorkspaceHints.Count
         };
     }
 
@@ -327,6 +367,33 @@ public sealed class GlobalStateService
         ], codexHome);
     }
 
+    private static List<ThreadWorkspaceHint> CollectThreadWorkspaceHintUpdates(
+        IEnumerable<ThreadWorkspaceHint> threadWorkspaceHints,
+        HashSet<string> allowedProjectKeys)
+    {
+        List<ThreadWorkspaceHint> updates = [];
+        foreach (ThreadWorkspaceHint hint in threadWorkspaceHints)
+        {
+            if (string.IsNullOrWhiteSpace(hint.Id))
+            {
+                continue;
+            }
+
+            string? normalized = NormalizeWorkspaceRootPath(hint.WorkspaceRoot);
+            string? key = WorkspaceRootKey(normalized);
+            if (string.IsNullOrWhiteSpace(normalized)
+                || string.IsNullOrWhiteSpace(key)
+                || !allowedProjectKeys.Contains(key))
+            {
+                continue;
+            }
+
+            updates.Add(new ThreadWorkspaceHint(hint.Id, normalized));
+        }
+
+        return updates;
+    }
+
     private static List<string> ReadStringArray(JsonObject? rootObject, string propertyName)
     {
         List<string> values = [];
@@ -404,5 +471,9 @@ public sealed class GlobalStateService
         public required int PinnedAddedCount { get; init; }
         public required IReadOnlyList<string> SkippedPinnedProjects { get; init; }
         public required int SkippedPinnedCount { get; init; }
+        public required IReadOnlyList<ThreadWorkspaceHint> AddedThreadWorkspaceHints { get; init; }
+        public required int AddedThreadWorkspaceHintCount { get; init; }
+        public required IReadOnlyList<ThreadWorkspaceHint> NormalizedThreadWorkspaceHints { get; init; }
+        public required int NormalizedThreadWorkspaceHintCount { get; init; }
     }
 }

@@ -37,8 +37,6 @@ import {
 } from "./session-files.js";
 import {
   assertSqliteWritable,
-  readSqliteProjectPaths,
-  readSqliteThreadWorkspaceHints,
   readSqliteProviderCounts,
   updateSqliteProvider
 } from "./sqlite-state.js";
@@ -197,8 +195,6 @@ export async function runSync({
       backupDir,
       durationMs: backupDurationMs
     });
-    const sqliteProjectPaths = await readSqliteProjectPaths(codexHome);
-    const sqliteThreadWorkspaceHints = await readSqliteThreadWorkspaceHints(codexHome);
     const pinnedProjectState = await readPinnedProjects(codexHome);
 
     let sessionRestoreNeeded = false;
@@ -224,7 +220,7 @@ export async function runSync({
       const sqliteResult = await updateSqliteProvider(
         codexHome,
         targetProvider,
-        async () => {
+        async (updateResult) => {
           if (writableChanges.length > 0) {
             applyResult = await applySessionChanges(writableChanges);
             const appliedPathSet = new Set(applyResult.appliedPaths ?? []);
@@ -235,9 +231,9 @@ export async function runSync({
           emitProgress(onProgress, { stage: "sync_sidebar_projects", status: "start" });
           sidebarSyncResult = await syncSidebarProjectsWithPinned(
             codexHome,
-            sqliteProjectPaths,
+            updateResult.projectPaths ?? [],
             pinnedProjectState.projects,
-            sqliteThreadWorkspaceHints
+            updateResult.threadWorkspaceHints ?? []
           );
           if (sidebarSyncResult.modified) {
             globalStateRestoreSnapshot = sidebarSyncResult;

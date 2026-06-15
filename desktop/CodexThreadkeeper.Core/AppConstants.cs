@@ -30,6 +30,16 @@ public static class AppConstants
         return Path.Combine(codexHome, GlobalStateFileBasename);
     }
 
+    public static string StateDbPath(string codexHome)
+    {
+        return Path.Combine(codexHome, "sqlite", DbFileBasename);
+    }
+
+    public static string LegacyStateDbPath(string codexHome)
+    {
+        return Path.Combine(codexHome, DbFileBasename);
+    }
+
     public static string PinnedSidebarProjectsPath(string codexHome)
     {
         return Path.Combine(codexHome, PinnedSidebarProjectsFileBasename);

@@ -46,7 +46,9 @@ public static class TextFormatter
             $"Added sidebar projects: {result.AddedSidebarProjects}",
             $"Restored pinned sidebar projects: {result.RestoredPinnedSidebarProjects}",
             $"Skipped missing pinned sidebar projects: {result.SkippedMissingPinnedSidebarProjects}",
-            $"Updated SQLite rows: {result.SqliteRowsUpdated}{(result.SqlitePresent ? string.Empty : " (state_5.sqlite not found)")}"
+            $"Updated SQLite rows: {result.SqliteRowsUpdated}{(result.SqlitePresent ? string.Empty : " (state_5.sqlite not found)")}",
+            $"Normalized SQLite cwd rows: {result.SqliteCwdRowsUpdated}{(result.SqlitePresent ? string.Empty : " (state_5.sqlite not found)")}",
+            $"Repaired SQLite user-event rows: {result.SqliteUserEventRowsUpdated}{(result.SqlitePresent ? string.Empty : " (state_5.sqlite not found)")}"
         ];
 
         if (result.SkippedLockedRolloutFiles.Count > 0)

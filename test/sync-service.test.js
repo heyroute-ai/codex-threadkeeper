@@ -23,6 +23,7 @@ async function makeTempCodexHome() {
   const codexHome = path.join(root, ".codex");
   await fs.mkdir(path.join(codexHome, "sessions", "2026", "03", "19"), { recursive: true });
   await fs.mkdir(path.join(codexHome, "archived_sessions", "2026", "03", "18"), { recursive: true });
+  await fs.mkdir(path.join(codexHome, "sqlite"), { recursive: true });
   return { root, codexHome };
 }
 
@@ -116,7 +117,7 @@ async function writePinnedProjects(codexHome, projects) {
 }
 
 async function writeStateDb(codexHome, rows) {
-  const dbPath = path.join(codexHome, "state_5.sqlite");
+  const dbPath = path.join(codexHome, "sqlite", "state_5.sqlite");
   const db = new DatabaseSync(dbPath);
   try {
     db.exec(`
@@ -266,7 +267,7 @@ test("runSync rewrites rollout files and sqlite, then restore reverts both", asy
   assert.deepEqual(syncedGlobalState["electron-saved-workspace-roots"], ["E:\\Existing", "E:\\Alpha", "E:\\Beta"]);
   assert.deepEqual(syncedGlobalState["project-order"], ["E:\\Existing", "E:\\Alpha", "E:\\Beta"]);
 
-  const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
   try {
     const providers = db
       .prepare("SELECT id, model_provider FROM threads ORDER BY id")
@@ -418,7 +419,7 @@ test("runSync leaves rollout files and sqlite untouched when sqlite is locked", 
     { id: "thread-a", model_provider: "apigather", archived: false, cwd: "E:\\LockedProject" }
   ]);
 
-  const lockDb = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  const lockDb = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
   try {
     lockDb.exec("BEGIN IMMEDIATE");
     await assert.rejects(
@@ -437,7 +438,7 @@ test("runSync leaves rollout files and sqlite untouched when sqlite is locked", 
   const rollout = await fs.readFile(sessionPath, "utf8");
   assert.match(rollout, /"model_provider":"apigather"/);
 
-  const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
   try {
     const row = db
       .prepare("SELECT model_provider FROM threads WHERE id = ?")
@@ -483,7 +484,7 @@ test("runSync skips locked rollout files and still updates sqlite", async () => 
   const rollout = await fs.readFile(sessionPath, "utf8");
   assert.match(rollout, /"model_provider":"apigather"/);
 
-  const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
   try {
     const row = db
       .prepare("SELECT model_provider FROM threads WHERE id = ?")
@@ -548,7 +549,7 @@ test("runSync normalizes extended-length sqlite cwd paths for visible projects",
   assert.equal(result.sqliteCwdRowsUpdated, 1);
   assert.equal(result.sqliteUserEventRowsUpdated, 1);
 
-  const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
   try {
     const row = db.prepare("SELECT cwd, has_user_event FROM threads WHERE id = ?").get("thread-a");
     assert.equal(row.cwd, "E:\\VisibleProject");
@@ -720,7 +721,7 @@ test("runSync fails on invalid global state json and rolls back rollout/sqlite c
   const rollout = await fs.readFile(sessionPath, "utf8");
   assert.match(rollout, /"model_provider":"apigather"/);
 
-  const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
   try {
     const row = db.prepare("SELECT model_provider FROM threads WHERE id = ?").get("thread-a");
     assert.equal(row.model_provider, "apigather");
@@ -751,7 +752,7 @@ test("runSync fails on invalid pinned project json before mutating rollout or sq
   const rollout = await fs.readFile(sessionPath, "utf8");
   assert.match(rollout, /"model_provider":"apigather"/);
 
-  const db = new DatabaseSync(path.join(codexHome, "state_5.sqlite"));
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
   try {
     const row = db.prepare("SELECT model_provider FROM threads WHERE id = ?").get("thread-a");
     assert.equal(row.model_provider, "apigather");

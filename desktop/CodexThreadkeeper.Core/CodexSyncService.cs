@@ -104,7 +104,6 @@ public sealed class CodexSyncService
 
         await _sqliteStateService.AssertSqliteWritableAsync(codexHome, sqliteBusyTimeoutMs);
         string backupDir = await _backupService.CreateBackupAsync(codexHome, targetProvider, writableChanges, configPath, configBackupText);
-        IReadOnlyList<string> sqliteProjectPaths = await _sqliteStateService.ReadSqliteProjectPathsAsync(codexHome);
         IReadOnlyList<string> pinnedProjects = await _pinnedSidebarProjectsService.LoadPinnedProjectsAsync(codexHome);
 
         bool sessionRestoreNeeded = false;
@@ -114,10 +113,10 @@ public sealed class CodexSyncService
         {
             SessionApplyResult? applyResult = null;
             GlobalStateService.SidebarSyncResult? sidebarSyncResult = null;
-            (int updatedRows, bool databasePresent) = await _sqliteStateService.UpdateSqliteProviderAsync(
+            SqliteUpdateResult sqliteResult = await _sqliteStateService.UpdateSqliteProviderAsync(
                 codexHome,
                 targetProvider,
-                async _ =>
+                async updateResult =>
                 {
                     if (writableChanges.Count > 0)
                     {
@@ -128,7 +127,11 @@ public sealed class CodexSyncService
                         await _backupService.UpdateSessionBackupManifestAsync(backupDir, appliedSessionChanges);
                     }
 
-                    sidebarSyncResult = await _globalStateService.SyncSidebarProjectsAsync(codexHome, sqliteProjectPaths, pinnedProjects);
+                    sidebarSyncResult = await _globalStateService.SyncSidebarProjectsAsync(
+                        codexHome,
+                        updateResult.ProjectPaths,
+                        pinnedProjects,
+                        updateResult.ThreadWorkspaceHints);
                     if (sidebarSyncResult.Modified)
                     {
                         globalStateRestoreSnapshot = sidebarSyncResult;
@@ -161,8 +164,10 @@ public sealed class CodexSyncService
                 RestoredPinnedSidebarProjects = sidebarSyncResult?.PinnedAddedCount ?? 0,
                 SkippedMissingPinnedSidebarProjects = sidebarSyncResult?.SkippedPinnedCount ?? 0,
                 SkippedLockedRolloutFiles = skippedRolloutFiles,
-                SqliteRowsUpdated = updatedRows,
-                SqlitePresent = databasePresent,
+                SqliteRowsUpdated = sqliteResult.UpdatedRows,
+                SqliteCwdRowsUpdated = sqliteResult.CwdRowsUpdated,
+                SqliteUserEventRowsUpdated = sqliteResult.UserEventRowsUpdated,
+                SqlitePresent = sqliteResult.DatabasePresent,
                 RolloutCountsBefore = sessionInfo.ProviderCounts,
                 AutoPruneResult = autoPruneResult,
                 AutoPruneWarning = autoPruneWarning
@@ -245,6 +250,8 @@ public sealed class CodexSyncService
                 SkippedMissingPinnedSidebarProjects = result.SkippedMissingPinnedSidebarProjects,
                 SkippedLockedRolloutFiles = result.SkippedLockedRolloutFiles,
                 SqliteRowsUpdated = result.SqliteRowsUpdated,
+                SqliteCwdRowsUpdated = result.SqliteCwdRowsUpdated,
+                SqliteUserEventRowsUpdated = result.SqliteUserEventRowsUpdated,
                 SqlitePresent = result.SqlitePresent,
                 RolloutCountsBefore = result.RolloutCountsBefore,
                 ConfigUpdated = true,

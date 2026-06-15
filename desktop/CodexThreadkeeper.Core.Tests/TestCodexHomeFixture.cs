@@ -21,6 +21,7 @@ internal sealed class TestCodexHomeFixture
         string codexHome = Path.Combine(root, ".codex");
         Directory.CreateDirectory(Path.Combine(codexHome, "sessions", "2026", "03", "19"));
         Directory.CreateDirectory(Path.Combine(codexHome, "archived_sessions", "2026", "03", "18"));
+        Directory.CreateDirectory(Path.Combine(codexHome, "sqlite"));
         return await Task.FromResult(new TestCodexHomeFixture(root, codexHome));
     }
 
@@ -180,17 +181,19 @@ internal sealed class TestCodexHomeFixture
 
     public async Task WriteStateDbAsync(IEnumerable<(string Id, string ModelProvider, bool Archived, string? Cwd)> rows)
     {
-        string dbPath = Path.Combine(CodexHome, "state_5.sqlite");
+        string dbPath = Path.Combine(CodexHome, "sqlite", "state_5.sqlite");
         await using SqliteConnection connection = OpenSqliteConnection();
         await connection.OpenAsync();
         SqliteCommand create = connection.CreateCommand();
         create.CommandText = """
             CREATE TABLE threads (
               id TEXT PRIMARY KEY,
+              rollout_path TEXT NOT NULL DEFAULT '',
               model_provider TEXT,
               archived INTEGER NOT NULL DEFAULT 0,
               first_user_message TEXT NOT NULL DEFAULT '',
-              cwd TEXT
+              cwd TEXT,
+              has_user_event INTEGER NOT NULL DEFAULT 0
             )
             """;
         await create.ExecuteNonQueryAsync();
@@ -199,8 +202,8 @@ internal sealed class TestCodexHomeFixture
         {
             SqliteCommand insert = connection.CreateCommand();
             insert.CommandText = """
-                INSERT INTO threads (id, model_provider, archived, first_user_message, cwd)
-                VALUES ($id, $provider, $archived, 'hello', $cwd)
+                INSERT INTO threads (id, rollout_path, model_provider, archived, first_user_message, cwd, has_user_event)
+                VALUES ($id, '', $provider, $archived, 'hello', $cwd, 1)
                 """;
             insert.Parameters.AddWithValue("$id", id);
             insert.Parameters.AddWithValue("$provider", modelProvider);
@@ -212,6 +215,6 @@ internal sealed class TestCodexHomeFixture
 
     public SqliteConnection OpenSqliteConnection()
     {
-        return new SqliteConnection($"Data Source={Path.Combine(CodexHome, "state_5.sqlite")};Mode=ReadWriteCreate;Pooling=False");
+        return new SqliteConnection($"Data Source={Path.Combine(CodexHome, "sqlite", "state_5.sqlite")};Mode=ReadWriteCreate;Pooling=False");
     }
 }

@@ -22,6 +22,7 @@ async function copyIfPresent(sourcePath, destinationPath) {
   } catch {
     return false;
   }
+  await fs.mkdir(path.dirname(destinationPath), { recursive: true });
   await fs.copyFile(sourcePath, destinationPath);
   return true;
 }
@@ -45,7 +46,10 @@ export async function createBackup({
   const copiedDbFiles = [];
   for (const suffix of ["", "-shm", "-wal"]) {
     const fileName = `${DB_FILE_BASENAME}${suffix}`;
-    const copied = await copyIfPresent(path.join(codexHome, fileName), path.join(dbDir, fileName));
+    const sourcePath = path.join(codexHome, "sqlite", fileName);
+    const fallbackPath = path.join(codexHome, fileName);
+    const copied = await copyIfPresent(sourcePath, path.join(dbDir, fileName))
+      || await copyIfPresent(fallbackPath, path.join(dbDir, fileName));
     if (copied) {
       copiedDbFiles.push(fileName);
     }
@@ -197,11 +201,15 @@ export async function restoreBackup(backupDir, codexHome, options = {}) {
     for (const suffix of ["", "-shm", "-wal"]) {
       const fileName = `${DB_FILE_BASENAME}${suffix}`;
       if (!backedUpFiles.has(fileName)) {
+        await removeIfPresent(path.join(codexHome, "sqlite", fileName));
         await removeIfPresent(path.join(codexHome, fileName));
       }
     }
     for (const fileName of metadata.dbFiles ?? []) {
-      await copyIfPresent(path.join(dbDir, fileName), path.join(codexHome, fileName));
+      const sqliteTarget = path.join(codexHome, "sqlite", fileName);
+      const legacyTarget = path.join(codexHome, fileName);
+      await copyIfPresent(path.join(dbDir, fileName), sqliteTarget);
+      await copyIfPresent(path.join(dbDir, fileName), legacyTarget);
     }
   }
 

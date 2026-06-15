@@ -68,6 +68,8 @@ public sealed class SyncResult
     public int SkippedMissingPinnedSidebarProjects { get; init; }
     public required IReadOnlyList<string> SkippedLockedRolloutFiles { get; init; }
     public required int SqliteRowsUpdated { get; init; }
+    public int SqliteCwdRowsUpdated { get; init; }
+    public int SqliteUserEventRowsUpdated { get; init; }
     public required bool SqlitePresent { get; init; }
     public required ProviderCounts RolloutCountsBefore { get; init; }
     public bool ConfigUpdated { get; init; }
@@ -135,6 +137,18 @@ public sealed class RestoreBackupOptions
     public bool RestoreDatabase { get; init; } = true;
     public bool RestoreSessions { get; init; } = true;
     public bool RestoreGlobalState { get; init; } = true;
+}
+
+public sealed record ThreadWorkspaceHint(string Id, string WorkspaceRoot);
+
+public sealed class SqliteUpdateResult
+{
+    public required int UpdatedRows { get; init; }
+    public int CwdRowsUpdated { get; init; }
+    public int UserEventRowsUpdated { get; init; }
+    public required bool DatabasePresent { get; init; }
+    public required IReadOnlyList<string> ProjectPaths { get; init; }
+    public required IReadOnlyList<ThreadWorkspaceHint> ThreadWorkspaceHints { get; init; }
 }
 
 internal sealed class BackupMetadataFile

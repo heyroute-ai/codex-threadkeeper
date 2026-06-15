@@ -31,7 +31,7 @@
 `codex-threadkeeper` 处理的正是这个问题。它会把这些状态重新对齐：
 
 - rollout 文件：`~/.codex/sessions`、`~/.codex/archived_sessions`
-- SQLite：`~/.codex/state_5.sqlite`
+- SQLite：`~/.codex/sqlite/state_5.sqlite`（兼容旧版 `~/.codex/state_5.sqlite`）
 - 侧边栏项目状态：`.codex-global-state.json`
 - 受管备份：`~/.codex/backups_state/threadkeeper`
 
