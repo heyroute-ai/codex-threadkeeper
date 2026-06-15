@@ -91,19 +91,17 @@ codex-threadkeeper status
 
 ## 最常见的一次完整使用流程
 
-先关闭正在占用 `.codex` 的进程：
-
-- Codex
-- Codex App
-- `app-server`
-- 还在访问当前会话文件的终端窗口
-
-然后执行：
+多数情况下不需要先关闭 Codex。建议先直接执行：
 
 ```bash
 codex-threadkeeper status
 codex-threadkeeper sync
 ```
+
+如果命令成功完成，就说明这次运行期间 SQLite 没有被独占锁住；Codex App 打开着也可以修复可见性。只有遇到下面两类情况时再处理占用：
+
+- 报 `state_5.sqlite is currently in use`：关闭 Codex / Codex App / `app-server` 后重跑同一个命令
+- 输出 `Skipped locked rollout files`：先结束对应活跃会话，之后再补跑一次 `codex-threadkeeper sync`
 
 你通常会在输出里看到这几项：
 
@@ -217,7 +215,7 @@ codex-threadkeeper switch openai --codex-home C:\Users\you\.codex
 
 ### 1. 提示 `state_5.sqlite is currently in use`
 
-这不是数据损坏，通常只是 Codex 还开着。
+这不是数据损坏，通常只是 SQLite 当时被 Codex / Codex App / `app-server` 独占了。不是每次都需要提前关闭 Codex；可以先直接跑 `codex-threadkeeper sync`，只有出现这个错误时再关闭相关进程。
 
 处理方式：
 
@@ -233,6 +231,7 @@ codex-threadkeeper switch openai --codex-home C:\Users\you\.codex
 - SQLite 大概率已经同步成功
 - 大部分 rollout 文件也已经改完
 - 只有那几个仍被占用的文件被跳过了
+- 如果没有 `state_5.sqlite is currently in use`，通常不需要为了这一步关闭整个 Codex
 
 处理方式：
 

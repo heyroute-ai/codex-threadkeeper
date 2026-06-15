@@ -124,12 +124,14 @@ GUI mapping:
 
 If the output says `state_5.sqlite is currently in use`:
 
+- explain that Codex does not always need to be closed before `sync`
 - tell the user to close Codex, Codex App, and app-server
 - then rerun the same command
 
 If sync reports `Skipped locked rollout files`:
 
 - treat the sync as mostly successful
+- if SQLite did not report `state_5.sqlite is currently in use`, do not require closing all of Codex
 - explain that the active session still holds one or more rollout files open
 - tell the user to rerun `codex-threadkeeper sync` after that session ends if they want a full rewrite
 

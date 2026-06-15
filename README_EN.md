@@ -93,19 +93,17 @@ codex-threadkeeper status
 
 ## A Typical End-To-End Run
 
-First close anything that may still be using `.codex`:
-
-- Codex
-- Codex App
-- `app-server`
-- terminals that still hold an active session file open
-
-Then run:
+In most cases, you do not need to close Codex first. Start by running:
 
 ```bash
 codex-threadkeeper status
 codex-threadkeeper sync
 ```
+
+If the command completes, SQLite was not exclusively locked during that run and Codex App can stay open. Only handle active processes when one of these appears:
+
+- `state_5.sqlite is currently in use`: close Codex / Codex App / `app-server`, then rerun the same command
+- `Skipped locked rollout files`: end the active session holding those rollout files, then rerun `codex-threadkeeper sync` later
 
 The most important fields in the sync summary are:
 
@@ -206,7 +204,7 @@ codex-threadkeeper switch openai --codex-home C:\Users\you\.codex
 
 ### `state_5.sqlite is currently in use`
 
-Usually Codex is still open.
+This is not data corruption. It usually means SQLite was exclusively locked by Codex / Codex App / `app-server` at that moment. You do not need to close Codex preemptively every time; try `codex-threadkeeper sync` first and close those processes only if this error appears.
 
 Close Codex / Codex App / `app-server`, then rerun the same command.
 
@@ -219,6 +217,7 @@ That means:
 - SQLite probably already synced
 - most rollout files probably already synced
 - only the still-locked files were skipped
+- if `state_5.sqlite is currently in use` did not appear, you usually do not need to close all of Codex for this case
 
 End that active session and rerun `codex-threadkeeper sync` later if you want a fully clean rewrite.
 
