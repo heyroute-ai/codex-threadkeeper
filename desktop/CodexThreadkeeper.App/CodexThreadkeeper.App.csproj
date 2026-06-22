@@ -12,7 +12,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>CodexThreadkeeper</AssemblyName>
     <Product>Codex Threadkeeper</Product>
-    <Company>panjinhe</Company>
+    <Company>heyroute-ai</Company>
   </PropertyGroup>
 
 </Project>

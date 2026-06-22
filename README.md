@@ -4,8 +4,8 @@
 
 ### 修复 Codex 中“线程还在，但切 provider 后看不见了”的问题
 
-[![CI](https://github.com/panjinhe/codex-threadkeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/panjinhe/codex-threadkeeper/actions/workflows/ci.yml)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://github.com/panjinhe/codex-threadkeeper)
+[![CI](https://github.com/heyroute-ai/codex-threadkeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/heyroute-ai/codex-threadkeeper/actions/workflows/ci.yml)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://github.com/heyroute-ai/codex-threadkeeper)
 [![Node](https://img.shields.io/badge/node-24%2B-brightgreen.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Community](https://img.shields.io/badge/community-LINUX%20DO-2ea043.svg)](https://linux.do/)
@@ -274,7 +274,7 @@ codex-threadkeeper restore C:\Users\you\.codex\backups_state\provider-sync\20260
 ## 开发
 
 ```bash
-git clone https://github.com/panjinhe/codex-threadkeeper.git
+git clone https://github.com/heyroute-ai/codex-threadkeeper.git
 cd codex-threadkeeper
 npm test
 dotnet test desktop/CodexThreadkeeper.Core.Tests/CodexThreadkeeper.Core.Tests.csproj

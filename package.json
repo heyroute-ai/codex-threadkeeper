@@ -19,6 +19,14 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/heyroute-ai/codex-threadkeeper.git"
+  },
+  "homepage": "https://github.com/heyroute-ai/codex-threadkeeper#readme",
+  "bugs": {
+    "url": "https://github.com/heyroute-ai/codex-threadkeeper/issues"
+  },
   "keywords": [
     "codex",
     "sqlite",
