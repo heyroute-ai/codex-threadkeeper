@@ -6,11 +6,7 @@ This file is for AI assistants, coding agents, and automation tools.
 
 Help the user keep historical Codex threads visible after switching `model_provider`, including provider metadata alignment and recovery from managed backups.
 
-For normal Windows users, prefer the GUI app when it is available. Use the CLI when:
-
-- the user explicitly wants commands
-- the task is automated
-- the GUI EXE is unavailable
+This project ships only the Node CLI. Use the CLI when executing directly, or give the user the one-shot prompt from the README when they want Codex to handle recovery for them.
 
 The tool primarily works by updating both:
 
@@ -52,14 +48,6 @@ When diagnosing, compare rollout counts and SQLite counts from `codex-threadkeep
 
 Use this order by default:
 
-1. If the GUI is available and the user is not asking for terminal commands, open `CodexThreadkeeper.exe`
-2. Refresh and inspect the current provider plus rollout/SQLite distribution
-3. Decide whether the user needs sync, switch-like behavior, or restore
-4. Execute the action
-5. Report whether the result is complete or partially skipped due to locked files
-
-CLI fallback flow:
-
 1. Run `codex-threadkeeper status`
 2. Read `Current provider` and compare rollout/SQLite distribution
 3. Decide whether the user needs `sync`, `switch`, or `restore`
@@ -91,23 +79,6 @@ Use `codex-threadkeeper status` only when:
 
 - the user asks for inspection only
 - you need a safe first step before deciding what to do
-
-## GUI Selection
-
-Use the GUI app when:
-
-- the user wants a double-click tool
-- the user does not want to install Node/npm
-- the user wants to visually inspect providers and backups
-
-GUI mapping:
-
-- `Refresh` = inspect current status
-- `Execute` without config checkbox = `sync --provider <selected>`
-- `Execute` with config checkbox = switch-like behavior
-- `Restore Backup` = restore a previous backup
-- backup retention defaults to 5 and can be customized in the GUI
-- `Clean Old Backups` = prune managed backups down to the selected retention count
 
 ## Important Behavior
 
@@ -145,9 +116,8 @@ If `switch <provider-id>` fails because the provider is missing:
 - default Codex home: `~/.codex`
 - prefer `status` before destructive-looking operations, even though this tool only edits metadata
 - by default the tool keeps the most recent 5 managed backups
-- use GUI retention settings or CLI `--keep <n>` when the user wants a different retention count
+- use CLI `--keep <n>` when the user wants a different retention count
 - do not edit `state_5.sqlite` or rollout files manually if the tool can do it
-- GUI settings live in `%AppData%\codex-threadkeeper\settings.json`
 
 ## Recommended Commands
 
@@ -174,15 +144,7 @@ codex-threadkeeper switch openai --codex-home C:\Users\you\.codex
 Use this prompt in another AI tool if the user wants one-step handling:
 
 ```text
-I use codex-threadkeeper. Please help me fix Codex session visibility under my current provider.
-
-Steps:
-1. Run `codex-threadkeeper status`.
-2. If my current provider is already correct, run `codex-threadkeeper sync`.
-3. If I explicitly tell you to switch provider, run `codex-threadkeeper switch <provider-id>` instead.
-4. If SQLite is locked, tell me to close Codex / Codex App / app-server and retry.
-5. If rollout files are skipped because they are locked, tell me which ones were skipped and remind me to rerun sync later.
-6. Summarize the final state of rollout files and SQLite after the command finishes.
+请使用[heyroute-ai/codex-threadkeeper](https://github.com/heyroute-ai/codex-threadkeeper)帮我恢复codex历史会话。
 ```
 
 ## User-Facing Summary Style

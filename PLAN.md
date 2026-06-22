@@ -228,7 +228,6 @@ CLI summary 追加一行：
 - 修改 `config.toml [projects.'...']`
 - 自动推断 worktree 对应的原仓库根目录
 - 自动清理“无线程引用”的旧侧边栏项目
-- 调整 GUI 项目展示逻辑
 - 修改线程 `cwd`
 - 修改 rollout 内除 provider 外的任何字段
 

@@ -52,5 +52,4 @@ If you switch Codex providers often, or want Codex to stay responsive during lon
 git clone https://github.com/heyroute-ai/codex-threadkeeper.git
 cd codex-threadkeeper
 npm test
-dotnet test desktop/CodexThreadkeeper.Core.Tests/CodexThreadkeeper.Core.Tests.csproj
 ```
