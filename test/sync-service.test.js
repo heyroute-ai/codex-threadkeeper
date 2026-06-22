@@ -148,6 +148,100 @@ async function writeStateDb(codexHome, rows) {
   }
 }
 
+async function writeCurrentCodexStateDb(codexHome, rows) {
+  const dbPath = path.join(codexHome, "sqlite", "state_5.sqlite");
+  const db = new DatabaseSync(dbPath);
+  try {
+    db.exec(`
+      CREATE TABLE threads (
+        id TEXT PRIMARY KEY,
+        rollout_path TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        source TEXT NOT NULL,
+        model_provider TEXT NOT NULL,
+        cwd TEXT NOT NULL,
+        title TEXT NOT NULL,
+        sandbox_policy TEXT NOT NULL,
+        approval_mode TEXT NOT NULL,
+        tokens_used INTEGER NOT NULL DEFAULT 0,
+        has_user_event INTEGER NOT NULL DEFAULT 0,
+        archived INTEGER NOT NULL DEFAULT 0,
+        archived_at INTEGER,
+        git_sha TEXT,
+        git_branch TEXT,
+        git_origin_url TEXT,
+        cli_version TEXT NOT NULL DEFAULT '',
+        first_user_message TEXT NOT NULL DEFAULT '',
+        agent_nickname TEXT,
+        agent_role TEXT,
+        memory_mode TEXT NOT NULL DEFAULT 'enabled',
+        model TEXT,
+        reasoning_effort TEXT,
+        agent_path TEXT,
+        created_at_ms INTEGER,
+        updated_at_ms INTEGER,
+        thread_source TEXT,
+        preview TEXT NOT NULL DEFAULT '',
+        recency_at INTEGER NOT NULL DEFAULT 0,
+        recency_at_ms INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    const stmt = db.prepare(`
+      INSERT INTO threads (
+        id,
+        rollout_path,
+        created_at,
+        updated_at,
+        source,
+        model_provider,
+        cwd,
+        title,
+        sandbox_policy,
+        approval_mode,
+        has_user_event,
+        archived,
+        cli_version,
+        first_user_message,
+        created_at_ms,
+        updated_at_ms,
+        preview,
+        recency_at,
+        recency_at_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const [index, row] of rows.entries()) {
+      const createdAt = row.created_at ?? 1773878400 + index;
+      const updatedAt = row.updated_at ?? createdAt;
+      const createdAtMs = row.created_at_ms ?? createdAt * 1000;
+      const updatedAtMs = row.updated_at_ms ?? updatedAt * 1000;
+      stmt.run(
+        row.id,
+        row.rollout_path ?? "",
+        createdAt,
+        updatedAt,
+        row.source ?? "cli",
+        row.model_provider,
+        row.cwd ?? "C:\\AITemp",
+        row.title ?? "hello",
+        row.sandbox_policy ?? "workspace-write",
+        row.approval_mode ?? "on-request",
+        row.has_user_event ? 1 : 0,
+        row.archived ? 1 : 0,
+        row.cli_version ?? "0.141.0",
+        row.first_user_message ?? "hello",
+        createdAtMs,
+        updatedAtMs,
+        row.preview ?? row.first_user_message ?? "hello",
+        row.recency_at ?? updatedAt,
+        row.recency_at_ms ?? updatedAtMs
+      );
+    }
+  } finally {
+    db.close();
+  }
+}
+
 async function lockRolloutFile(filePath, shareMode = "None") {
   const script = `
 & {
@@ -557,6 +651,59 @@ test("runSync normalizes extended-length sqlite cwd paths for visible projects",
   } finally {
     db.close();
   }
+});
+
+test("runSync supports current Codex threads schema", async () => {
+  const { codexHome } = await makeTempCodexHome();
+  await writeConfig(codexHome, 'model_provider = "openai"');
+  await writeGlobalState(codexHome, {
+    "electron-saved-workspace-roots": ["E:\\RealSchemaProject"],
+    "project-order": ["E:\\RealSchemaProject"],
+    "thread-workspace-root-hints": {}
+  });
+  const sessionPath = path.join(codexHome, "sessions", "2026", "03", "19", "rollout-current-schema.jsonl");
+  await writeRollout(sessionPath, "thread-current", "apigather");
+  await writeCurrentCodexStateDb(codexHome, [
+    {
+      id: "thread-current",
+      rollout_path: sessionPath,
+      model_provider: "apigather",
+      archived: false,
+      cwd: "\\\\?\\E:\\RealSchemaProject",
+      has_user_event: false,
+      preview: "hello current schema"
+    }
+  ]);
+
+  const result = await runSync({ codexHome });
+  assert.equal(result.changedSessionFiles, 1);
+  assert.equal(result.sqliteRowsUpdated, 1);
+  assert.equal(result.sqliteCwdRowsUpdated, 1);
+  assert.equal(result.sqliteUserEventRowsUpdated, 1);
+  assert.equal(result.addedSidebarProjects, 0);
+  assert.equal(result.addedThreadWorkspaceHints, 1);
+
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
+  try {
+    const row = db.prepare(`
+      SELECT model_provider, cwd, has_user_event, preview, recency_at, recency_at_ms
+      FROM threads
+      WHERE id = ?
+    `).get("thread-current");
+    assert.deepEqual({ ...row }, {
+      model_provider: "openai",
+      cwd: "E:\\RealSchemaProject",
+      has_user_event: 1,
+      preview: "hello current schema",
+      recency_at: 1773878400,
+      recency_at_ms: 1773878400000
+    });
+  } finally {
+    db.close();
+  }
+
+  const globalState = await readGlobalState(codexHome);
+  assert.equal(globalState["thread-workspace-root-hints"]["thread-current"], "E:\\RealSchemaProject");
 });
 
 test("runSync adds missing thread workspace hints for existing sidebar projects", async () => {
