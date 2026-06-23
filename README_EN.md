@@ -8,7 +8,7 @@ A Codex session recovery and sync tool. It fixes cases where historical threads 
 
 ## Supported Codex Version
 
-Current compatibility target: `@openai/codex` `0.141.0` (npm latest on 2026-06-22).
+Current compatibility target: `@openai/codex` `0.142.0` (npm latest on 2026-06-23).
 
 Modern Codex does not rely only on rollout files. It also reads SQLite state, thread working directories, user-event flags, and sidebar project state. Older tools, or tools that only rewrite rollout files, may no longer restore stable history visibility on current Codex versions.
 

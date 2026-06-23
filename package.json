@@ -1,6 +1,6 @@
 {
   "name": "codex-threadkeeper",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Keep Codex threads visible by syncing session metadata, SQLite state, and managed backups.",
   "type": "module",
   "files": [

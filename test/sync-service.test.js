@@ -228,7 +228,7 @@ async function writeCurrentCodexStateDb(codexHome, rows) {
         row.approval_mode ?? "on-request",
         row.has_user_event ? 1 : 0,
         row.archived ? 1 : 0,
-        row.cli_version ?? "0.141.0",
+        row.cli_version ?? "0.142.0",
         row.first_user_message ?? "hello",
         createdAtMs,
         updatedAtMs,
