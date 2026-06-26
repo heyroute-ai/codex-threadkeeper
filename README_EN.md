@@ -1,6 +1,10 @@
 # codex-threadkeeper
 
-<h1 align="center">请使用 <a href="https://github.com/heyroute-ai/codex-threadkeeper">heyroute-ai/codex-threadkeeper</a> 帮我恢复 codex 历史会话。</h1>
+<div align="center">
+  <h2>使用方法</h2>
+  <p><strong>在打开的 Codex 窗口中输入复制粘贴以下内容：</strong></p>
+  <h1>请使用 <a href="https://github.com/heyroute-ai/codex-threadkeeper">heyroute-ai/codex-threadkeeper</a> 帮我恢复 codex 历史会话。</h1>
+</div>
 
 ## Quick Use
 
