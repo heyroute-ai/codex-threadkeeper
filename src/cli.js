@@ -19,8 +19,8 @@ function printHelp() {
 
 Usage:
   codex-threadkeeper status [--codex-home PATH]
-  codex-threadkeeper sync [--provider ID] [--keep N] [--codex-home PATH]
-  codex-threadkeeper switch <provider-id> [--keep N] [--codex-home PATH]
+  codex-threadkeeper sync [--provider ID] [--keep N] [--restore-pinned-projects] [--codex-home PATH]
+  codex-threadkeeper switch <provider-id> [--keep N] [--restore-pinned-projects] [--codex-home PATH]
   codex-threadkeeper prune-backups [--keep N] [--codex-home PATH]
   codex-threadkeeper restore <backup-dir> [--codex-home PATH]
   codex-threadkeeper list-pinned-projects [--codex-home PATH]
@@ -196,6 +196,7 @@ async function main() {
       codexHome: flags["codex-home"],
       provider: flags.provider,
       keepCount: parseKeepCount(flags.keep),
+      restorePinnedProjects: flags["restore-pinned-projects"] === true,
       onProgress: createSyncProgressReporter()
     });
     console.log(summarizeSync(result, "Synchronized"));
@@ -208,6 +209,7 @@ async function main() {
       codexHome: flags["codex-home"],
       provider,
       keepCount: parseKeepCount(flags.keep),
+      restorePinnedProjects: flags["restore-pinned-projects"] === true,
       onProgress: createSyncProgressReporter()
     });
     console.log(summarizeSync(result, "Switched to"));

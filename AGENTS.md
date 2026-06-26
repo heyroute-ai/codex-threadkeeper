@@ -90,6 +90,7 @@ Use `codex-threadkeeper status` only when:
 - the tool does not log the user in and does not manage `auth.json`
 - sync and switch create a backup first, then automatically prune older managed backups
 - backup pruning only touches backups created by this tool under `backups_state/threadkeeper`
+- pinned sidebar projects are optional and disabled by default during `sync` / `switch`; use `--restore-pinned-projects` only when the user explicitly wants the old fixed project list restored
 
 ## Error Handling
 
@@ -126,6 +127,7 @@ codex-threadkeeper status
 codex-threadkeeper sync
 codex-threadkeeper sync --keep 5
 codex-threadkeeper sync --provider openai
+codex-threadkeeper sync --restore-pinned-projects
 codex-threadkeeper switch apigather
 codex-threadkeeper prune-backups --keep 5
 codex-threadkeeper restore C:\Users\you\.codex\backups_state\threadkeeper\20260319T042708906Z

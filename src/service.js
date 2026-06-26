@@ -25,7 +25,7 @@ import {
 import { acquireLock } from "./locking.js";
 import {
   restoreGlobalStateSnapshot,
-  syncSidebarProjectsWithPinned
+  syncSidebarProjects
 } from "./global-state.js";
 import { readPinnedProjects } from "./pinned-projects.js";
 import {
@@ -126,6 +126,7 @@ export async function runSync({
   provider,
   configBackupText,
   keepCount = DEFAULT_BACKUP_RETENTION_COUNT,
+  restorePinnedProjects = false,
   sqliteBusyTimeoutMs,
   onProgress
 } = {}) {
@@ -195,7 +196,9 @@ export async function runSync({
       backupDir,
       durationMs: backupDurationMs
     });
-    const pinnedProjectState = await readPinnedProjects(codexHome);
+    const pinnedProjectState = restorePinnedProjects
+      ? await readPinnedProjects(codexHome)
+      : { projects: [] };
 
     let sessionRestoreNeeded = false;
     let appliedSessionChanges = [];
@@ -229,11 +232,11 @@ export async function runSync({
             await updateSessionBackupManifest(backupDir, appliedSessionChanges);
           }
           emitProgress(onProgress, { stage: "sync_sidebar_projects", status: "start" });
-          sidebarSyncResult = await syncSidebarProjectsWithPinned(
+          sidebarSyncResult = await syncSidebarProjects(
             codexHome,
             updateResult.projectPaths ?? [],
-            pinnedProjectState.projects,
-            updateResult.threadWorkspaceHints ?? []
+            updateResult.threadWorkspaceHints ?? [],
+            pinnedProjectState.projects
           );
           if (sidebarSyncResult.modified) {
             globalStateRestoreSnapshot = sidebarSyncResult;
@@ -340,6 +343,7 @@ export async function runSwitch({
   codexHome: explicitCodexHome,
   provider,
   keepCount = DEFAULT_BACKUP_RETENTION_COUNT,
+  restorePinnedProjects = false,
   onProgress
 }) {
   if (!provider) {
@@ -373,6 +377,7 @@ export async function runSwitch({
       provider,
       configBackupText: originalConfigText,
       keepCount,
+      restorePinnedProjects,
       onProgress
     });
     return {

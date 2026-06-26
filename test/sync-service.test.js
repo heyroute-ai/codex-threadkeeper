@@ -738,7 +738,7 @@ test("runSync adds missing thread workspace hints for existing sidebar projects"
   assert.deepEqual(globalState["project-order"], ["E:\\VisibleProject"]);
 });
 
-test("runSync restores pinned sidebar projects even when global state only keeps two projects", async () => {
+test("runSync ignores pinned sidebar projects by default", async () => {
   const { codexHome, root } = await makeTempCodexHome();
   await writeConfig(codexHome, 'model_provider = "openai"');
   const pinnedProjects = [
@@ -769,6 +769,46 @@ test("runSync restores pinned sidebar projects even when global state only keeps
   assert.equal(result.changedSessionFiles, 0);
   assert.equal(result.sqliteRowsUpdated, 0);
   assert.equal(result.addedSidebarProjects, 0);
+  assert.equal(result.restoredPinnedSidebarProjects, 0);
+  assert.equal(result.skippedMissingPinnedSidebarProjects, 0);
+
+  const globalState = await readGlobalState(codexHome);
+  assert.deepEqual(globalState["electron-saved-workspace-roots"], pinnedProjects.slice(5));
+  assert.deepEqual(globalState["project-order"], pinnedProjects.slice(5));
+  assert.deepEqual(globalState["active-workspace-roots"], [pinnedProjects[6]]);
+});
+
+test("runSync restores pinned sidebar projects only when explicitly enabled", async () => {
+  const { codexHome, root } = await makeTempCodexHome();
+  await writeConfig(codexHome, 'model_provider = "openai"');
+  const pinnedProjects = [
+    path.join(root, "Playground"),
+    path.join(root, "RedNote-WebOps"),
+    path.join(root, "ahe-ai-video-workflow"),
+    path.join(root, "Skygarden"),
+    path.join(root, "minsy_mvp_frontend_v2"),
+    path.join(root, "Astock_Next"),
+    path.join(root, "codex-threadkeeper")
+  ];
+  for (const project of pinnedProjects) {
+    await fs.mkdir(project, { recursive: true });
+  }
+  await writeGlobalState(codexHome, {
+    "electron-saved-workspace-roots": [pinnedProjects[5], pinnedProjects[6]],
+    "project-order": [pinnedProjects[5], pinnedProjects[6]],
+    "active-workspace-roots": [pinnedProjects[6]]
+  });
+  await writePinnedProjects(codexHome, pinnedProjects);
+  const sessionPath = path.join(codexHome, "sessions", "2026", "03", "19", "rollout-a.jsonl");
+  await writeRollout(sessionPath, "thread-a", "openai");
+  await writeStateDb(codexHome, [
+    { id: "thread-a", model_provider: "openai", archived: false, cwd: pinnedProjects[5] }
+  ]);
+
+  const result = await runSync({ codexHome, restorePinnedProjects: true });
+  assert.equal(result.changedSessionFiles, 0);
+  assert.equal(result.sqliteRowsUpdated, 0);
+  assert.equal(result.addedSidebarProjects, 0);
   assert.equal(result.restoredPinnedSidebarProjects, 5);
   assert.equal(result.skippedMissingPinnedSidebarProjects, 0);
 
@@ -778,7 +818,7 @@ test("runSync restores pinned sidebar projects even when global state only keeps
   assert.deepEqual(globalState["active-workspace-roots"], [pinnedProjects[6]]);
 });
 
-test("runSync skips missing pinned sidebar projects and surfaces their count", async () => {
+test("runSync skips missing pinned sidebar projects when explicitly enabled", async () => {
   const { codexHome, root } = await makeTempCodexHome();
   await writeConfig(codexHome, 'model_provider = "openai"');
   await writeGlobalState(codexHome, {});
@@ -789,7 +829,7 @@ test("runSync skips missing pinned sidebar projects and surfaces their count", a
     { id: "thread-a", model_provider: "openai", archived: false, cwd: "E:\\AnotherProject" }
   ]);
 
-  const result = await runSync({ codexHome });
+  const result = await runSync({ codexHome, restorePinnedProjects: true });
   assert.equal(result.addedSidebarProjects, 0);
   assert.equal(result.restoredPinnedSidebarProjects, 0);
   assert.equal(result.skippedMissingPinnedSidebarProjects, 1);
@@ -880,7 +920,36 @@ test("runSync fails on invalid global state json and rolls back rollout/sqlite c
   assert.equal(globalStateText, "{not valid json");
 });
 
-test("runSync fails on invalid pinned project json before mutating rollout or sqlite", async () => {
+test("runSync ignores invalid pinned project json by default", async () => {
+  const { codexHome } = await makeTempCodexHome();
+  await writeConfig(codexHome, 'model_provider = "openai"');
+  await writeGlobalState(codexHome, {});
+  await fs.writeFile(path.join(codexHome, "threadkeeper-sidebar-projects.json"), "{broken", "utf8");
+  const sessionPath = path.join(codexHome, "sessions", "2026", "03", "19", "rollout-a.jsonl");
+  await writeRollout(sessionPath, "thread-a", "apigather");
+  await writeStateDb(codexHome, [
+    { id: "thread-a", model_provider: "apigather", archived: false, cwd: "E:\\BrokenPinned" }
+  ]);
+
+  const result = await runSync({ codexHome });
+  assert.equal(result.changedSessionFiles, 1);
+  assert.equal(result.sqliteRowsUpdated, 1);
+  assert.equal(result.restoredPinnedSidebarProjects, 0);
+  assert.equal(result.skippedMissingPinnedSidebarProjects, 0);
+
+  const rollout = await fs.readFile(sessionPath, "utf8");
+  assert.match(rollout, /"model_provider":"openai"/);
+
+  const db = new DatabaseSync(path.join(codexHome, "sqlite", "state_5.sqlite"));
+  try {
+    const row = db.prepare("SELECT model_provider FROM threads WHERE id = ?").get("thread-a");
+    assert.equal(row.model_provider, "openai");
+  } finally {
+    db.close();
+  }
+});
+
+test("runSync validates pinned project json when pinned restore is enabled", async () => {
   const { codexHome } = await makeTempCodexHome();
   await writeConfig(codexHome, 'model_provider = "openai"');
   await writeGlobalState(codexHome, {});
@@ -892,7 +961,7 @@ test("runSync fails on invalid pinned project json before mutating rollout or sq
   ]);
 
   await assert.rejects(
-    () => runSync({ codexHome }),
+    () => runSync({ codexHome, restorePinnedProjects: true }),
     /Invalid threadkeeper-sidebar-projects\.json/
   );
 

@@ -1,5 +1,22 @@
 # codex-threadkeeper
 
+<h1 align="center">请使用 <a href="https://github.com/heyroute-ai/codex-threadkeeper">heyroute-ai/codex-threadkeeper</a> 帮我恢复 codex 历史会话。</h1>
+
+## Quick Use
+
+No prior install is required. Run the latest published version directly:
+
+```bash
+npx codex-threadkeeper sync
+```
+
+For frequent use, install it globally:
+
+```bash
+npm install -g codex-threadkeeper
+codex-threadkeeper sync
+```
+
 A Codex session recovery and sync tool. It fixes cases where historical threads still exist after switching `model_provider`, but Codex CLI / Codex App no longer show them, sidebar projects disappear, or `codex resume` and the App disagree.
 
 [![CI](https://github.com/heyroute-ai/codex-threadkeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/heyroute-ai/codex-threadkeeper/actions/workflows/ci.yml)
@@ -21,11 +38,7 @@ Modern Codex does not rely only on rollout files. It also reads SQLite state, th
 - `.codex-global-state.json`
 - `~/.codex/backups_state/threadkeeper`
 
-## Usage
-
-Copy this prompt to Codex and ask it to restore your historical conversations:
-
-> 请使用[heyroute-ai/codex-threadkeeper](https://github.com/heyroute-ai/codex-threadkeeper)帮我恢复codex历史会话。
+By default, `sync` / `switch` repairs sidebar projects from existing Codex state and thread metadata only. It does not force-restore the legacy fixed project list in `threadkeeper-sidebar-projects.json`. If you still want that extra safeguard, manage the list with `pin-project` and pass `--restore-pinned-projects` during sync.
 
 ## Why Use HeyRoute
 

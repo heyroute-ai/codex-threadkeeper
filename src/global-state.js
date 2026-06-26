@@ -166,8 +166,8 @@ export async function readGlobalState(codexHome) {
   };
 }
 
-export async function syncSidebarProjects(codexHome, workspaceRoots) {
-  return syncSidebarProjectsWithPinned(codexHome, workspaceRoots, []);
+export async function syncSidebarProjects(codexHome, workspaceRoots, threadWorkspaceHints = [], pinnedProjects = []) {
+  return syncSidebarProjectsWithPinned(codexHome, workspaceRoots, pinnedProjects, threadWorkspaceHints);
 }
 
 function collectThreadWorkspaceHintUpdates(threadWorkspaceHints, allowedProjectKeys) {
